@@ -18,10 +18,14 @@ __author__ = [
 __license__ = "PTC Only"
 __contributors__ = "Neil, Brian "
 
-print("This is a test string from init.py at module level")
 
+#logFormatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
+#rootLogger = logging.getLogger()
 
-if __name__ == "__main__":
-    print("This is a test string my main at module level.")
-    print("Start to call util.py now")
-    util.test_print()
+#fileHandler = logging.FileHandler("{0}/{1}.log".format(os.path.abspath("./logs/"), "uditransfer.log"))
+#fileHandler.setFormatter(logFormatter)
+#rootLogger.addHandler(fileHandler)
+
+#consoleHandler = logging.StreamHandler()
+#consoleHandler.setFormatter(logFormatter)
+#rootLogger.addHandler(consoleHandler)
