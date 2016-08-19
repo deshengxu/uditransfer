@@ -8,7 +8,7 @@ except ImportError:
     from distutils.core import setup
 from uditransfer import __version__
 
-setup(name='ca.py',
+setup(name='monitor.py',
       version=__version__,
       description='uditransfer.py: copy HL7 message and acknowledgements',
       author='Desheng Xu',
