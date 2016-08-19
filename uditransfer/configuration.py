@@ -20,6 +20,11 @@ class monitor_configuration():
         self.folder_logs = None
 
         self.sleeptime = 100
+        self.operation_method_is_copy = False
+        self.operation_method_is_write = False
+        self.operation_method_is_move = False
+        self.operation_delay = 0.1
+        self.recheck_content = False
 
         self.validate_configuration(configuration_file)
 
@@ -53,6 +58,31 @@ class monitor_configuration():
         self.stdout_log = self.__get_log_option(parser.get('General', 'stdout_log'), logging.INFO)
         self.all_file_log = self.__get_log_option(parser.get('General', 'all_file_log'), logging.DEBUG)
 
+        operation_method = parser.get('General','operation_method')
+        if operation_method:
+            operation_method = operation_method.upper()
+        else:
+            operation_method = 'COPY'
+
+        if operation_method=='COPY':
+            self.operation_method_is_copy = True
+        elif operation_method =='WRITE':
+            self.operation_method_is_write = True
+        else:
+            self.operation_method_is_move = True
+
+        operation_delay = parser.get('General', 'operation_delay')
+        try:
+            self.operation_delay = float(operation_delay)
+        except:
+            self.operation_delay = 0.1
+
+        recheck_content = parser.get('General', 'recheck_content')
+
+        if recheck_content and recheck_content.upper() == 'TRUE':
+            self.recheck_content = True
+        else:
+            self.recheck_content = False
 
         self.sleeptime = int(parser.get('General', 'sleeptime'))
 

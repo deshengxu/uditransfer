@@ -204,12 +204,42 @@ def read_content_from_orphan(my_config, orphan):
     with open(os.path.join(my_config.folder_remoteorphan, orphan), 'r') as content_file:
         return content_file.read()
 
+def create_file(my_config, source_file, target_file, file_content, notes):
+    if my_config.operation_delay>0:
+        time.sleep(my_config.operation_delay)
+
+    try:
+        if my_config.operation_method_is_move:
+            shutil.move(source_file, target_file)
+            logging.info("Successfully moved %s to %s for %s file." %
+                         (source_file, target_file, notes))
+        elif my_config.operation_method_is_copy:
+            shutil.copyfile(source_file, target_file)
+            logging.info("Successfully copied %s to %s for %s file." %
+                         (source_file, target_file, notes))
+        else:
+            if my_config.recheck_content:
+                new_file_content = read_content_from_orphan(my_config, os.path.basename(source_file))
+                if not file_content == new_file_content:
+                    logging.debug("%s file content has been changed since ACK detect, "
+                                  "it will be ignored this time." % notes)
+            with open(target_file, "w") as target:
+                target.write(file_content)
+                logging.info("Successfully write down %s content into file:%s" % (notes,target_file))
+
+        return True
+    except Exception as e:
+        logging.error("Error happened in %s file operation!" % notes)
+        return False
+
+    return False
 
 def process_ack1_file(my_config, orphan, file_content):
     message_id = get_messageid_from_ack1_content(file_content)
 
     source_file = os.path.join(my_config.folder_remoteorphan, orphan)
     target_file = os.path.join(my_config.folder_localinbox, orphan)
+    ack1_flag = os.path.join(my_config.folder_ack1flag, orphan)
     ack2_flag = os.path.join(my_config.folder_ack2flag, message_id)
     file_tobedelete = os.path.join(my_config.folder_tobedeleted, orphan)
 
@@ -217,9 +247,9 @@ def process_ack1_file(my_config, orphan, file_content):
         # copy or write, it's a question. let's try from write content!
         # shutil.copyfile(source_file, target_file)
         logging.debug("Start to write ack1 content into local inbox folder!")
-        with open(target_file, "w") as target_ack1:
-            target_ack1.write(file_content)
-            logging.info("Successfully write down ACK1 content into file:%s" % target_file)
+        if not create_file(my_config, source_file, target_file, file_content, "ACK1"):
+            logging.error("Unexpected error happened in ack1 file creation!")
+            return
 
         touch(ack2_flag)
         logging.info("Successfully create an empty ack2 flag file:%s" % ack2_flag)
@@ -227,10 +257,13 @@ def process_ack1_file(my_config, orphan, file_content):
         logging.info("Successfully create an empty file to be deleted:%s" % file_tobedelete)
 
         try:
-            os.remove(source_file)
-            logging.info("Successfully removed original source file from remote orphan folder:%s" % source_file)
+            if not my_config.operation_method_is_move:
+                os.remove(source_file)
+                logging.info("Successfully removed original source file from remote orphan folder:%s" % source_file)
             os.remove(file_tobedelete)
             logging.info("Successfully removed flag of file to be deleted!")
+            os.remove(ack1_flag)
+            logging.info("Successfully removed ack1 flag!")
         except IOError as (errno, strerror):
             logging.ERROR("process_ack1_file remove I/O error({0}): {1}".format(errno, strerror))
         except Exception as e:
@@ -242,29 +275,35 @@ def process_ack1_file(my_config, orphan, file_content):
 
 
 def process_ack2_file(my_config, orphan, file_content):
+    message_id = get_messageid_from_ack2_content(file_content)
     core_id = get_coreid_from_ack2_content(file_content)
 
     source_file = os.path.join(my_config.folder_remoteorphan, orphan)
     target_file = os.path.join(my_config.folder_localinbox, orphan)
+    ack2_flag = os.path.join(my_config.folder_ack2flag, message_id)
     ack3_flag = os.path.join(my_config.folder_ack3flag, core_id)
     file_tobedelete = os.path.join(my_config.folder_tobedeleted, orphan)
 
     try:
         # shutil.copyfile(source_file, target_file)
         logging.debug("Start to write down content to ACK2 file!")
-        with open(target_file, "w") as target_ack2:
-            target_ack2.write(file_content)
-            logging.info("Successfully write down ack2 into:%s" % orphan)
+        if not create_file(my_config, source_file, target_file, file_content, "ACK2"):
+            logging.error("Unexpected error happened in ack2 file creation!")
+            return
+
         touch(ack3_flag)
         logging.info("Successfully create an empty ack3 flag:%s" % ack3_flag)
         touch(file_tobedelete)
         logging.info("Successfully create an empty flag for file to be delete")
 
         try:
-            os.remove(source_file)
-            logging.info("Successfully removed original source file:%s" % source_file)
+            if not my_config.operation_method_is_move:
+                os.remove(source_file)
+                logging.info("Successfully removed original source file:%s" % source_file)
             os.remove(file_tobedelete)
             logging.info("Successfully removed flag of file to be delete!")
+            os.remove(ack2_flag)
+            logging.info("Successfully removed ack2 flag!")
         except IOError as (errno, strerror):
             logging.ERROR("process_ack2_file remove I/O error({0}): {1}".format(errno, strerror))
         except Exception as e:
@@ -276,24 +315,30 @@ def process_ack2_file(my_config, orphan, file_content):
 
 
 def process_ack3_file(my_config, orphan, file_content):
+    core_id = get_coreid_from_ack3_content(file_content)
     source_file = os.path.join(my_config.folder_remoteorphan, orphan)
     target_file = os.path.join(my_config.folder_localinbox, orphan)
+    ack3_flag = os.path.join(my_config.folder_ack3flag, core_id)
     file_tobedelete = os.path.join(my_config.folder_tobedeleted, orphan)
 
     try:
         logging.debug("Start process_ack3_file...")
-        with open(target_file, "w") as target_ack3:
-            target_ack3.write(file_content)
-            logging.info("Successfully write down content to ACK3 file:%s" % target_file)
+        if not create_file(my_config, source_file, target_file, file_content, "ACK3"):
+            logging.error("Unexpected error happened in ack3 file creation!")
+            return
+
         #logging.info("Start to create flag file to be deleted:%s" % file_tobedelete)
         touch(file_tobedelete)
         logging.info("Successfully created an empty flag file to be deleted")
 
         try:
-            os.remove(source_file)
-            logging.info("Successfully removed original source file:%s" % source_file)
+            if not my_config.operation_method_is_move:
+                os.remove(source_file)
+                logging.info("Successfully removed original source file:%s" % source_file)
             os.remove(file_tobedelete)
             logging.info("Successfully removed flag file to be deleted!")
+            os.remove(ack3_flag)
+            logging.info("Successfully removed ack3 flag!")
         except IOError as (errno, strerror):
             logging.ERROR("process_ack3_file remove I/O error({0}): {1}".format(errno, strerror))
         except Exception as e:
@@ -346,7 +391,6 @@ def process_folders(my_config):
     logging.info("Start processing")
     process_hl7_message(my_config)
     process_orphan_acks(my_config)
-    logging.info("sleeping...\n\n")
 
 
 def main():
@@ -374,6 +418,7 @@ def main():
         try:
             while True:
                 process_folders(my_config)
+                logging.info("sleeping...\n\n")
                 time.sleep(my_config.sleeptime)
         except KeyboardInterrupt:
             logging.info("Process stopped!")

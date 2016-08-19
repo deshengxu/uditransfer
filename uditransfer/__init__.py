@@ -11,7 +11,7 @@ try:
 except:
     import util
 
-__version__ = "0.01"
+__version__ = "0.02"
 __author__ = [
     "Desheng Xu <dxu@ptc.com>"
 ]
