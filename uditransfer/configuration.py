@@ -1,6 +1,6 @@
 import sys
 import os
-
+import logging
 import codecs
 
 from ConfigParser import SafeConfigParser
@@ -23,6 +23,17 @@ class monitor_configuration():
 
         self.validate_configuration(configuration_file)
 
+    def __get_log_option(self, log_str, default_log):
+        log_dict = {
+            'DEBUG':logging.DEBUG,
+            'INFO':logging.INFO,
+            'WARNING':logging.WARNING,
+            'ERROR':logging.ERROR,
+            'CRITICAL':logging.CRITICAL
+        }
+
+        return log_dict.get(log_str, default_log)
+
     def validate_configuration(self, configuration_file):
         parser = SafeConfigParser()
         with codecs.open(configuration_file,'r', encoding='utf-8') as cf:
@@ -39,6 +50,9 @@ class monitor_configuration():
         self.folder_ack3flag = parser.get('General','folder_ack3flag')
         self.folder_tobedeleted = parser.get('General','folder_tobedeleted')
         self.folder_logs = parser.get('General', 'folder_logs')
+        self.stdout_log = self.__get_log_option(parser.get('General', 'stdout_log'), logging.INFO)
+        self.all_file_log = self.__get_log_option(parser.get('General', 'all_file_log'), logging.DEBUG)
+
 
         self.sleeptime = int(parser.get('General', 'sleeptime'))
 

@@ -38,11 +38,11 @@ def create_ack1_flag_from_hl7(my_config, hl7_file):
         logging.info("Successfully copied %s to %s!" % (src_file, target_file))
         return True
     except IOError as (errno, strerror):
-        logging.critical("I/O error({0}): {1}".format(errno, strerror))
+        logging.ERROR("I/O error({0}): {1}".format(errno, strerror))
         return False
-    except:
-        logging.critical("Unexpected error:", sys.exc_info()[0])
-        logging.debug("Error happened in copy %s to ack1_flag folder!" % hl7_file)
+    except Exception as e:
+        logging.ERROR("Unexpected error:", sys.exc_info()[0])
+        logging.exception("Error happened in copy %s to ack1_flag folder!" % hl7_file)
         return False
 
 
@@ -55,11 +55,11 @@ def copy_hl7_to_remoteoutbox(my_config, hl7_file):
         logging.info("Successfully copied %s to %s!" % (src_file, target_file))
         return True
     except IOError as (errno, strerror):
-        logging.critical("I/O error({0}): {1}".format(errno, strerror))
+        logging.ERROR("I/O error({0}): {1}".format(errno, strerror))
         return False
-    except:
-        logging.critical("Unexpected error:", sys.exc_info()[0])
-        logging.debug("Error happened in copy %s to remote outbox folder!" % hl7_file)
+    except Exception as e:
+        logging.ERROR("Unexpected error:", sys.exc_info()[0])
+        logging.exception("Error happened in copy %s to remote outbox folder!" % hl7_file)
         return False
 
 
@@ -71,18 +71,18 @@ def delete_hl7_message(my_config, hl7_file):
         logging.info("Successfully removed file:%s" % target_file)
         return True
     except IOError as (errno, strerror):
-        logging.critical("I/O error({0}): {1}".format(errno, strerror))
+        logging.ERROR("I/O error({0}): {1}".format(errno, strerror))
         return False
-    except:
-        logging.critical("Unexpected error:", sys.exc_info()[0])
-        logging.debug("Failed to remove file:%s" % hl7_file)
+    except Exception as e:
+        logging.ERROR("Unexpected error:", sys.exc_info()[0])
+        logging.exception("Failed to remove file:%s" % hl7_file)
         return False
 
 
 def process_hl7_message(my_config):
     logging.info("Start to process HL7 message in local outbox folder...")
-    if not os.path.exists(my_config.folder_localinbox):
-        logging.critical("Local inbox folder doesn't exist! Please check your configuration file!")
+    if not os.path.exists(my_config.folder_localoutbox):
+        logging.ERROR("Local outbox folder doesn't exist! Please check your configuration file!")
         return
 
     file_list = get_hl7_message_files(my_config)
@@ -95,38 +95,63 @@ def process_hl7_message(my_config):
                     hl7_delete_status = delete_hl7_message(my_config, hl7_file)
         else:
             logging.warnning("Unknown file found in HL7 local outbox folder:%s" % os.path.basename(hl7_file))
-    logging.info("Processing in local outbox folder is finished!")
+    logging.info("Processing in local outbox folder has been finished!")
 
 
 def detect_ack_file(my_config, orphan, file_content,
                                     ack1_flag_files, ack2_flag_files, ack3_flag_files):
     file_name = os.path.basename(orphan)
 
+    logging.info("Start to detect ack types!")
+    logging.info("Looking for file name:%s in ack1-flag folder" % file_name)
     if file_name in ack1_flag_files:
+        logging.info("Found ack1 flag:%s" % file_name)
         return 'ACK1', True
+    else:
+        logging.info("This is not a ACK1 for CCM")
 
+    logging.info("Looking for message ID from potential ack2 content:%s" % orphan)
     message_id = get_messageid_from_ack2_content(file_content)
 
-    if message_id and message_id in ack2_flag_files:
-        return 'ACK2', True
+    if message_id:
+        logging.info("Found message ID from ack2:%s" % message_id)
+        if message_id in ack2_flag_files:
+            logging.info("Found this message ID in ack2 flag folder!")
+            return 'ACK2', True
+        else:
+            logging.info("This message ID is not for CCM!")
+            return 'ACK2', False
+    else:
+        logging.info("Couldn't find message ID from this content. it's not a ACK2 file!")
 
+    logging.info("Try to look for core ID from ack3 content")
     core_id = get_coreid_from_ack3_content(file_content)
 
-    if core_id and core_id in ack3_flag_files:
-        return 'ACK3', True
+    if core_id:
+        logging.info("Found core id:%s" % core_id)
+        if core_id in ack3_flag_files:
+            logging.info("Found this core id in ack3 flag folder!")
+            return 'ACK3', True
+        else:
+            logging.info("This cord ID is not for CCM!")
+            return 'ACK3', False
+    else:
+        logging.info("Couldn't find CoreID from this content. This is not a ACK3 file!")
 
-    return None, False
+    logging.info("Nothing detected!")
+    return '', False
 
 
 def get_coreid_from_ack2_content(file_content):
+    logging.debug(file_content)
     CORE_ID = r'CoreId:'
     DATA_RECEIVED = r'DateTime Receipt Generated:'
 
-    int_start = file_content.index(CORE_ID)
-    int_end = file_content.index(DATA_RECEIVED, int_start)
+    int_start = file_content.find(CORE_ID)
+    int_end = file_content.find(DATA_RECEIVED, int_start)
 
     if int_start>=0 and int_end>=0:
-        coreId = file_content.index(int_start+len(CORE_ID)+1, int_end)
+        coreId = file_content[int_start+len(CORE_ID) : int_end]
         if coreId:
             return coreId.strip()
 
@@ -134,21 +159,24 @@ def get_coreid_from_ack2_content(file_content):
 
 
 def get_coreid_from_ack3_content(file_content):
+    logging.debug(file_content)
     ACK3_XML1 = r'<?xml version="1.0" encoding="UTF-8"?>'
     ACK3_XML2 = r'<submission>'
     CORE_ID_START = r'<coreId>'
     CORE_ID_END = r'</coreId>'
-    if file_content.lindex(ACK3_XML1)>=0 and file_content.lindex(ACK3_XML2)>=0:
-        int_start = file_content.index(CORE_ID_START)
-        int_end = file_content.index(CORE_ID_END)
+    #print(file_content)
+    if file_content.find(ACK3_XML1)>=0 and file_content.find(ACK3_XML2)>=0:
+        int_start = file_content.find(CORE_ID_START)
+        int_end = file_content.find(CORE_ID_END)
         if int_start>=0 and int_end>=0:
-            return file_content[int_start+1:int_end]
+            return file_content[int_start+len(CORE_ID_START):int_end]
 
     return None
 
 
 def get_messageid_from_ack1_content(file_content):
-    return file_content[file_content.index("<")+1 : file_content.index(">")]
+    logging.debug(file_content)
+    return file_content[file_content.find("<")+1 : file_content.find(">")]
 
 
 def get_messageid_from_ack2_content(file_content):
@@ -157,8 +185,10 @@ def get_messageid_from_ack2_content(file_content):
     :param file_content:
     :return:
     '''
-    if file_content.lindex('MessageId')>0:
-        return file_content[file_content.lindex("<")+1:file_content.rindex(">")]
+    logging.debug(file_content)
+    if file_content.find('MessageId')>=0:
+        logging.info("Found MessageID in ack2 content!")
+        return (file_content[file_content.find("<")+1:file_content.rfind(">")]).strip()
     else:
         return None
 
@@ -186,23 +216,29 @@ def process_ack1_file(my_config, orphan, file_content):
     try:
         # copy or write, it's a question. let's try from write content!
         # shutil.copyfile(source_file, target_file)
+        logging.debug("Start to write ack1 content into local inbox folder!")
         with open(target_file, "w") as target_ack1:
             target_ack1.write(file_content)
+            logging.info("Successfully write down ACK1 content into file:%s" % target_file)
 
         touch(ack2_flag)
+        logging.info("Successfully create an empty ack2 flag file:%s" % ack2_flag)
         touch(file_tobedelete)
+        logging.info("Successfully create an empty file to be deleted:%s" % file_tobedelete)
 
         try:
             os.remove(source_file)
+            logging.info("Successfully removed original source file from remote orphan folder:%s" % source_file)
             os.remove(file_tobedelete)
+            logging.info("Successfully removed flag of file to be deleted!")
         except IOError as (errno, strerror):
-            logging.critical("I/O error({0}): {1}".format(errno, strerror))
-        except:
-            logging.critical("Unexpected error:", sys.exc_info()[0])
+            logging.ERROR("process_ack1_file remove I/O error({0}): {1}".format(errno, strerror))
+        except Exception as e:
+            logging.exception("process_ack1_file remove Unexpected error:{0}".format(sys.exc_info()[0]))
     except IOError as (errno, strerror):
-        logging.critical("I/O error({0}): {1}".format(errno, strerror))
-    except:
-        logging.critical("Unexpected error:", sys.exc_info()[0])
+        logging.ERROR("process_ack1_file I/O error({0}): {1}".format(errno, strerror))
+    except Exception as e:
+        logging.exception("process_ack1_file Unexpected error:", sys.exc_info()[0])
 
 
 def process_ack2_file(my_config, orphan, file_content):
@@ -215,79 +251,102 @@ def process_ack2_file(my_config, orphan, file_content):
 
     try:
         # shutil.copyfile(source_file, target_file)
+        logging.debug("Start to write down content to ACK2 file!")
         with open(target_file, "w") as target_ack2:
             target_ack2.write(file_content)
+            logging.info("Successfully write down ack2 into:%s" % orphan)
         touch(ack3_flag)
+        logging.info("Successfully create an empty ack3 flag:%s" % ack3_flag)
         touch(file_tobedelete)
+        logging.info("Successfully create an empty flag for file to be delete")
 
         try:
             os.remove(source_file)
+            logging.info("Successfully removed original source file:%s" % source_file)
             os.remove(file_tobedelete)
+            logging.info("Successfully removed flag of file to be delete!")
         except IOError as (errno, strerror):
-            logging.critical("I/O error({0}): {1}".format(errno, strerror))
-        except:
-            logging.critical("Unexpected error:", sys.exc_info()[0])
+            logging.ERROR("process_ack2_file remove I/O error({0}): {1}".format(errno, strerror))
+        except Exception as e:
+            logging.exception("process_ack2_file remove Unexpected error:{0}".format(sys.exc_info()[0]))
     except IOError as (errno, strerror):
-        logging.critical("I/O error({0}): {1}".format(errno, strerror))
-    except:
-        logging.critical("Unexpected error:", sys.exc_info()[0])
+        logging.ERROR("process_ack2_file I/O error({0}): {1}".format(errno, strerror))
+    except Exception as e:
+        logging.exception("process_ack2_file Unexpected error:{0}".format(sys.exc_info()[0]))
 
 
 def process_ack3_file(my_config, orphan, file_content):
     source_file = os.path.join(my_config.folder_remoteorphan, orphan)
     target_file = os.path.join(my_config.folder_localinbox, orphan)
-    file_tobedelete = os.path.join(my_config.folder_tobedeleted)
+    file_tobedelete = os.path.join(my_config.folder_tobedeleted, orphan)
 
     try:
+        logging.debug("Start process_ack3_file...")
         with open(target_file, "w") as target_ack3:
             target_ack3.write(file_content)
+            logging.info("Successfully write down content to ACK3 file:%s" % target_file)
+        #logging.info("Start to create flag file to be deleted:%s" % file_tobedelete)
         touch(file_tobedelete)
+        logging.info("Successfully created an empty flag file to be deleted")
 
         try:
             os.remove(source_file)
+            logging.info("Successfully removed original source file:%s" % source_file)
             os.remove(file_tobedelete)
+            logging.info("Successfully removed flag file to be deleted!")
         except IOError as (errno, strerror):
-            logging.critical("I/O error({0}): {1}".format(errno, strerror))
-        except:
-            logging.critical("Unexpected error:", sys.exc_info()[0])
+            logging.ERROR("process_ack3_file remove I/O error({0}): {1}".format(errno, strerror))
+        except Exception as e:
+            logging.exception("process_ack3_file remove Unexpected error:{0}".format(sys.exc_info()[0]))
     except IOError as (errno, strerror):
-        logging.critical("I/O error({0}): {1}".format(errno, strerror))
-    except:
-        logging.critical("Unexpected error:", sys.exc_info()[0])
+        logging.ERROR("process_ack3_file I/O error({0}): {1}".format(errno, strerror))
+    except Exception as e:
+        logging.exception("process_ack3_file Unexpected error:{0}".format(sys.exc_info()[0]))
 
 
 def process_orphan_acks(my_config):
+    logging.info("Start to process ack(s) folder...")
     ack1_flag_files = get_file_list(my_config.folder_ack1flag)
+    logging.debug("ACK1, ACK2, ACK3, Orphan list:")
+    logging.debug(ack1_flag_files)
     ack2_flag_files = get_file_list(my_config.folder_ack2flag)
+    logging.debug(ack2_flag_files)
     ack3_flag_files = get_file_list(my_config.folder_ack3flag)
+    logging.debug(ack3_flag_files)
 
     orphan_files = get_file_list(my_config.folder_remoteorphan)
+    logging.debug(orphan_files)
 
     for orphan in orphan_files:
         # in order for safe access, read all it's content first.
-        logging.info("\tProccessing %s" % orphan)
+        logging.info("Proccessing %s from ack(s) folder." % orphan)
         try:
             file_content = read_content_from_orphan(my_config, orphan)
             ack_type, is_for_ccm = detect_ack_file(my_config, orphan, file_content,
                                                    ack1_flag_files, ack2_flag_files, ack3_flag_files)
             if is_for_ccm:
+                logging.debug("\tFound ACK type:%s" % ack_type)
                 if ack_type == 'ACK1':
                     process_ack1_file(my_config, orphan, file_content)
                 elif ack_type == 'ACK2':
                     process_ack2_file(my_config, orphan, file_content)
-                else:
+                elif ack_type == 'ACK3':
                     process_ack3_file(my_config, orphan, file_content)
+            else:
+                logging.debug("\tThis file is not for CCM!")
 
         except IOError as (errno, strerror):
-            logging.critical("I/O error({0}): {1}".format(errno, strerror))
-        except:
-            logging.critical("Unexpected error:", sys.exc_info()[0])
+            logging.ERROR("I/O error({0}): {1}".format(errno, strerror))
+        except Exception as e:
+            logging.exception("process_orphan_acks Unexpected error:{0}".format(sys.exc_info()[0]))
+    logging.info("Processing in ack(s) folder has been finished!")
 
 
 def process_folders(my_config):
-    logging.warning("Process starting...")
+    logging.info("Start processing")
     process_hl7_message(my_config)
     process_orphan_acks(my_config)
+    logging.info("sleeping...\n\n")
 
 
 def main():
@@ -296,6 +355,9 @@ def main():
                         help = "path to store logs")
     parser.add_argument('-c', action="store", dest="configuration", required=False,
                         help="configuration file")
+    parser.add_argument('-p', action="store_true", dest="periodical", required=False, default=False,
+                        help="periodically run with interval time defined in configuration.")
+
     args = parser.parse_args()
     if not args.configuration:
         sys.exit("please provide a configuration file!")
@@ -304,16 +366,19 @@ def main():
     if args.logpath:
         util.initialize_logger(args.logpath)
     else:
-        util.initialize_logger(my_config.folder_logs)
+        util.initialize_logger(my_config.folder_logs, my_config.stdout_log, my_config.all_file_log)
 
     logging.info("Configuration and Logs have been settled down!")
 
-    try:
-        while True:
-            process_folders(my_config)
-            time.sleep(my_config.sleeptime)
-    except KeyboardInterrupt:
-        logging.info("Process stopped!")
+    if args.periodical:
+        try:
+            while True:
+                process_folders(my_config)
+                time.sleep(my_config.sleeptime)
+        except KeyboardInterrupt:
+            logging.info("Process stopped!")
+    else:
+        process_folders(my_config)
 
 
 

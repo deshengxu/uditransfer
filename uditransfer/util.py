@@ -2,7 +2,7 @@ import logging
 import os.path
 import sys
 
-def initialize_logger(output_dir):
+def initialize_logger(output_dir, stream_loglevel = logging.INFO, all_loglevel=logging.DEBUG):
     try:
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
@@ -14,7 +14,7 @@ def initialize_logger(output_dir):
 
     # create console handler and set level to info
     handler = logging.StreamHandler()
-    handler.setLevel(logging.INFO)
+    handler.setLevel(stream_loglevel)
     formatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
@@ -28,7 +28,7 @@ def initialize_logger(output_dir):
 
     # create debug file handler and set level to debug
     handler = logging.FileHandler(os.path.join(output_dir, "all.log"), "a+")
-    handler.setLevel(logging.DEBUG)
+    handler.setLevel(all_loglevel)
     formatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
