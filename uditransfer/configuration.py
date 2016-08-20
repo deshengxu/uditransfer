@@ -25,6 +25,9 @@ class monitor_configuration():
         self.operation_method_is_move = False
         self.operation_delay = 0.1
         self.recheck_content = False
+        self.hl7_operation_method_is_copy = False
+        self.hl7_operation_method_is_move = False
+        self.hl7_operation_delay = 0.1
 
         self.validate_configuration(configuration_file)
 
@@ -58,6 +61,7 @@ class monitor_configuration():
         self.stdout_log = self.__get_log_option(parser.get('General', 'stdout_log'), logging.INFO)
         self.all_file_log = self.__get_log_option(parser.get('General', 'all_file_log'), logging.DEBUG)
 
+        # ack operation parameters
         operation_method = parser.get('General','operation_method')
         if operation_method:
             operation_method = operation_method.upper()
@@ -72,6 +76,7 @@ class monitor_configuration():
             self.operation_method_is_move = True
 
         operation_delay = parser.get('General', 'operation_delay')
+
         try:
             self.operation_delay = float(operation_delay)
         except:
@@ -83,6 +88,25 @@ class monitor_configuration():
             self.recheck_content = True
         else:
             self.recheck_content = False
+
+        # HL7 operation parameters
+        hl7_operation_method = parser.get('General', 'hl7_operation_method')
+        if hl7_operation_method:
+            hl7_operation_method = hl7_operation_method.upper()
+        else:
+            hl7_operation_method = 'COPY'
+
+        if hl7_operation_method == 'COPY':
+            self.hl7_operation_method_is_copy = True
+        else:
+            self.hl7_operation_method_is_move = True
+
+        hl7_operation_delay = parser.get('General', 'hl7_operation_delay')
+
+        try:
+            self.hl7_operation_delay = float(hl7_operation_delay)
+        except:
+            self.hl7_operation_delay = 0.1
 
         self.sleeptime = int(parser.get('General', 'sleeptime'))
 

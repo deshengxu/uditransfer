@@ -93,14 +93,20 @@ class MonitorTestCase(unittest.TestCase):
                 shutil.copyfile(src_file, target_file)
 
         orphan_files = self.get_file_list(self.config.folder_remoteorphan)
-        assert(len(orphan_files) == len(ack_files))
+        #assert(len(orphan_files) == len(ack_files))
 
         monitor.process_orphan_acks(self.config)
+        local_inbox_files = self.get_file_list(self.config.folder_localinbox)
+        assert (len(local_inbox_files) == 1)
+
         monitor.process_orphan_acks(self.config)
+        local_inbox_files = self.get_file_list(self.config.folder_localinbox)
+        assert (len(local_inbox_files) == 2)
+
         monitor.process_orphan_acks(self.config)
 
         local_inbox_files = self.get_file_list(self.config.folder_localinbox)
-        assert(len(local_inbox_files) == len(ack_files))
+        assert(len(local_inbox_files) == 3)
         assert (os.path.exists(os.path.join(self.config.folder_localinbox, ack1_file)))
         assert (os.path.exists(os.path.join(self.config.folder_localinbox, ack2_file)))
         assert (os.path.exists(os.path.join(self.config.folder_localinbox, ack3_file)))
@@ -121,6 +127,8 @@ class MonitorTestCase(unittest.TestCase):
             assert(os.path.exists(tgtfile))
 
         total_files = len(onlyfiles)
+        files_in_localoutbox = monitor.get_file_list(self.config.folder_localoutbox)
+        assert (len(files_in_localoutbox) == total_files)
 
         monitor.process_hl7_message(self.config)
 

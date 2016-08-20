@@ -38,51 +38,45 @@ def create_ack1_flag_from_hl7(my_config, hl7_file):
         logging.info("Successfully copied %s to %s!" % (src_file, target_file))
         return True
     except IOError as (errno, strerror):
-        logging.ERROR("I/O error({0}): {1}".format(errno, strerror))
+        logging.error("I/O error({0}): {1}".format(errno, strerror))
         return False
     except Exception as e:
-        logging.ERROR("Unexpected error:", sys.exc_info()[0])
+        logging.error("Unexpected error:", sys.exc_info()[0])
         logging.exception("Error happened in copy %s to ack1_flag folder!" % hl7_file)
         return False
 
 
-def copy_hl7_to_remoteoutbox(my_config, hl7_file):
+def copy_or_move_hl7_to_remoteoutbox(my_config, hl7_file):
     try:
         src_file = os.path.join(my_config.folder_localoutbox, hl7_file)
         target_file = os.path.join(my_config.folder_remoteoutbox, hl7_file)
-        logging.debug("Start to copy %s to %s" % (src_file, target_file))
-        shutil.copyfile(src_file, target_file)
-        logging.info("Successfully copied %s to %s!" % (src_file, target_file))
+        if my_config.hl7_operation_delay>0:
+            time.sleep(my_config.hl7_operation_delay)
+
+        if my_config.hl7_operation_method_is_copy:
+            logging.debug("Start to copy %s to %s" % (src_file, target_file))
+            shutil.copyfile(src_file, target_file)
+            logging.info("Successfully copied %s to %s!" % (src_file, target_file))
+            os.remove(src_file)
+            logging.info("Successfully removed source file after copy:%s" % src_file)
+        else:
+            logging.debug("Start to move %s to %s" % (src_file, target_file))
+            shutil.move(src_file, target_file)
+            logging.info("Successfully moved %s to %s!" % (src_file, target_file))
+
         return True
     except IOError as (errno, strerror):
-        logging.ERROR("I/O error({0}): {1}".format(errno, strerror))
+        logging.error("I/O error({0}): {1}".format(errno, strerror))
         return False
     except Exception as e:
-        logging.ERROR("Unexpected error:", sys.exc_info()[0])
+        logging.error("Unexpected error:{0}".format(sys.exc_info()[0]))
         logging.exception("Error happened in copy %s to remote outbox folder!" % hl7_file)
         return False
-
-
-def delete_hl7_message(my_config, hl7_file):
-    try:
-        target_file = os.path.join(my_config.folder_localoutbox, hl7_file)
-        logging.debug("Start to remove file:%s" % target_file)
-        os.remove(target_file)
-        logging.info("Successfully removed file:%s" % target_file)
-        return True
-    except IOError as (errno, strerror):
-        logging.ERROR("I/O error({0}): {1}".format(errno, strerror))
-        return False
-    except Exception as e:
-        logging.ERROR("Unexpected error:", sys.exc_info()[0])
-        logging.exception("Failed to remove file:%s" % hl7_file)
-        return False
-
 
 def process_hl7_message(my_config):
     logging.info("Start to process HL7 message in local outbox folder...")
     if not os.path.exists(my_config.folder_localoutbox):
-        logging.ERROR("Local outbox folder doesn't exist! Please check your configuration file!")
+        logging.error("Local outbox folder doesn't exist! Please check your configuration file!")
         return
 
     file_list = get_hl7_message_files(my_config)
@@ -90,9 +84,7 @@ def process_hl7_message(my_config):
         if is_valid_hl7(hl7_file):
             ack1_flag_copy_status = create_ack1_flag_from_hl7(my_config, hl7_file)
             if ack1_flag_copy_status:
-                hl7_copy_status = copy_hl7_to_remoteoutbox(my_config, hl7_file)
-                if hl7_copy_status:
-                    hl7_delete_status = delete_hl7_message(my_config, hl7_file)
+                hl7_copy_status = copy_or_move_hl7_to_remoteoutbox(my_config, hl7_file)
         else:
             logging.warnning("Unknown file found in HL7 local outbox folder:%s" % os.path.basename(hl7_file))
     logging.info("Processing in local outbox folder has been finished!")
@@ -229,7 +221,7 @@ def create_file(my_config, source_file, target_file, file_content, notes):
 
         return True
     except Exception as e:
-        logging.error("Error happened in %s file operation!" % notes)
+        logging.exception("Error happened in %s file operation!" % notes)
         return False
 
     return False
@@ -265,11 +257,11 @@ def process_ack1_file(my_config, orphan, file_content):
             os.remove(ack1_flag)
             logging.info("Successfully removed ack1 flag!")
         except IOError as (errno, strerror):
-            logging.ERROR("process_ack1_file remove I/O error({0}): {1}".format(errno, strerror))
+            logging.error("process_ack1_file remove I/O error({0}): {1}".format(errno, strerror))
         except Exception as e:
             logging.exception("process_ack1_file remove Unexpected error:{0}".format(sys.exc_info()[0]))
     except IOError as (errno, strerror):
-        logging.ERROR("process_ack1_file I/O error({0}): {1}".format(errno, strerror))
+        logging.error("process_ack1_file I/O error({0}): {1}".format(errno, strerror))
     except Exception as e:
         logging.exception("process_ack1_file Unexpected error:", sys.exc_info()[0])
 
@@ -305,11 +297,11 @@ def process_ack2_file(my_config, orphan, file_content):
             os.remove(ack2_flag)
             logging.info("Successfully removed ack2 flag!")
         except IOError as (errno, strerror):
-            logging.ERROR("process_ack2_file remove I/O error({0}): {1}".format(errno, strerror))
+            logging.error("process_ack2_file remove I/O error({0}): {1}".format(errno, strerror))
         except Exception as e:
             logging.exception("process_ack2_file remove Unexpected error:{0}".format(sys.exc_info()[0]))
     except IOError as (errno, strerror):
-        logging.ERROR("process_ack2_file I/O error({0}): {1}".format(errno, strerror))
+        logging.error("process_ack2_file I/O error({0}): {1}".format(errno, strerror))
     except Exception as e:
         logging.exception("process_ack2_file Unexpected error:{0}".format(sys.exc_info()[0]))
 
@@ -340,11 +332,11 @@ def process_ack3_file(my_config, orphan, file_content):
             os.remove(ack3_flag)
             logging.info("Successfully removed ack3 flag!")
         except IOError as (errno, strerror):
-            logging.ERROR("process_ack3_file remove I/O error({0}): {1}".format(errno, strerror))
+            logging.error("process_ack3_file remove I/O error({0}): {1}".format(errno, strerror))
         except Exception as e:
             logging.exception("process_ack3_file remove Unexpected error:{0}".format(sys.exc_info()[0]))
     except IOError as (errno, strerror):
-        logging.ERROR("process_ack3_file I/O error({0}): {1}".format(errno, strerror))
+        logging.error("process_ack3_file I/O error({0}): {1}".format(errno, strerror))
     except Exception as e:
         logging.exception("process_ack3_file Unexpected error:{0}".format(sys.exc_info()[0]))
 
@@ -381,7 +373,7 @@ def process_orphan_acks(my_config):
                 logging.debug("\tThis file is not for CCM!")
 
         except IOError as (errno, strerror):
-            logging.ERROR("I/O error({0}): {1}".format(errno, strerror))
+            logging.error("I/O error({0}): {1}".format(errno, strerror))
         except Exception as e:
             logging.exception("process_orphan_acks Unexpected error:{0}".format(sys.exc_info()[0]))
     logging.info("Processing in ack(s) folder has been finished!")
