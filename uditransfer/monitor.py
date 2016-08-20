@@ -33,6 +33,9 @@ def create_ack1_flag_from_hl7(my_config, hl7_file):
     try:
         src_file = os.path.join(my_config.folder_localoutbox, hl7_file)
         target_file = os.path.join(my_config.folder_ack1flag, hl7_file)
+        if my_config.hl7_operation_delay>0:
+            time.sleep(my_config.hl7_operation_delay)
+
         logging.debug("Start to copy %s to %s" % (src_file, target_file))
         shutil.copyfile(src_file, target_file)
         logging.info("Successfully copied %s to %s!" % (src_file, target_file))
@@ -50,8 +53,6 @@ def copy_or_move_hl7_to_remoteoutbox(my_config, hl7_file):
     try:
         src_file = os.path.join(my_config.folder_localoutbox, hl7_file)
         target_file = os.path.join(my_config.folder_remoteoutbox, hl7_file)
-        if my_config.hl7_operation_delay>0:
-            time.sleep(my_config.hl7_operation_delay)
 
         if my_config.hl7_operation_method_is_copy:
             logging.debug("Start to copy %s to %s" % (src_file, target_file))
