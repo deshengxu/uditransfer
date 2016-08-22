@@ -4,7 +4,7 @@ import time
 import argparse
 import os
 import shutil
-
+import tarfile
 
 sys.path.append(".")
 
@@ -18,14 +18,38 @@ except:
 def get_hl7_message_files(my_config):
     return get_file_list(my_config.folder_localoutbox)
 
+def is_valid_hl7_message(hl7_fullname):
+    try:
 
-def is_valid_hl7(hl7_file):
-    return True
+        tar = tarfile.open(hl7_fullname, 'r:gz')
+        for tar_info in tar:
+            name_info = (tar_info.name).upper()
+            if "SUBMISSION.XML" in name_info:
+                logging.info("%s is a valid HL7 message tar.gz package!" % hl7_fullname)
+                return True
+
+        return False
+    except tarfile.ReadError as re:
+        logging.info(hl7_fullname + " " + str(re))
+        return False
+    except Exception as e:
+        logging.error("Unacceptable HL7 tar.gz package received. it will be ignored!")
+        logging.exception("Exception")
+        return False
+
+    return False
+
+def is_valid_hl7(my_config, hl7_file):
+    if my_config.hl7_operation_delay > 0:
+        time.sleep(my_config.hl7_operation_delay)
+
+    return is_valid_hl7_message(os.path.join(my_config.folder_localoutbox, os.path.basename(hl7_file)))
+
 
 
 def get_file_list(folder):
     onlyfiles = [f for f in os.listdir(folder)
-                 if os.path.isfile(os.path.join(folder, f))]
+                 if (os.path.isfile(os.path.join(folder, f)) and (not f.startswith('.')))]
     return onlyfiles
 
 
@@ -33,8 +57,8 @@ def create_ack1_flag_from_hl7(my_config, hl7_file):
     try:
         src_file = os.path.join(my_config.folder_localoutbox, hl7_file)
         target_file = os.path.join(my_config.folder_ack1flag, hl7_file)
-        if my_config.hl7_operation_delay>0:
-            time.sleep(my_config.hl7_operation_delay)
+        #if my_config.hl7_operation_delay>0:
+        #    time.sleep(my_config.hl7_operation_delay)
 
         logging.debug("Start to copy %s to %s" % (src_file, target_file))
         shutil.copyfile(src_file, target_file)
@@ -82,12 +106,12 @@ def process_hl7_message(my_config):
 
     file_list = get_hl7_message_files(my_config)
     for hl7_file in file_list:
-        if is_valid_hl7(hl7_file):
+        if is_valid_hl7(my_config, hl7_file):
             ack1_flag_copy_status = create_ack1_flag_from_hl7(my_config, hl7_file)
             if ack1_flag_copy_status:
                 hl7_copy_status = copy_or_move_hl7_to_remoteoutbox(my_config, hl7_file)
         else:
-            logging.warnning("Unknown file found in HL7 local outbox folder:%s" % os.path.basename(hl7_file))
+            logging.warning("Unknown file found in HL7 local outbox folder:%s" % os.path.basename(hl7_file))
     logging.info("Processing in local outbox folder has been finished!")
 
 
@@ -228,15 +252,15 @@ def create_file(my_config, source_file, target_file, file_content, notes):
     return False
 
 def process_ack1_file(my_config, orphan, file_content):
-    message_id = get_messageid_from_ack1_content(file_content)
-
-    source_file = os.path.join(my_config.folder_remoteorphan, orphan)
-    target_file = os.path.join(my_config.folder_localinbox, orphan)
-    ack1_flag = os.path.join(my_config.folder_ack1flag, orphan)
-    ack2_flag = os.path.join(my_config.folder_ack2flag, message_id)
-    file_tobedelete = os.path.join(my_config.folder_tobedeleted, orphan)
-
     try:
+        message_id = get_messageid_from_ack1_content(file_content)
+
+        source_file = os.path.join(my_config.folder_remoteorphan, orphan)
+        target_file = os.path.join(my_config.folder_localinbox, orphan)
+        ack1_flag = os.path.join(my_config.folder_ack1flag, orphan)
+        ack2_flag = os.path.join(my_config.folder_ack2flag, message_id)
+        file_tobedelete = os.path.join(my_config.folder_tobedeleted, orphan)
+
         # copy or write, it's a question. let's try from write content!
         # shutil.copyfile(source_file, target_file)
         logging.debug("Start to write ack1 content into local inbox folder!")
@@ -261,6 +285,9 @@ def process_ack1_file(my_config, orphan, file_content):
             logging.error("process_ack1_file remove I/O error({0}): {1}".format(errno, strerror))
         except Exception as e:
             logging.exception("process_ack1_file remove Unexpected error:{0}".format(sys.exc_info()[0]))
+    except UnicodeDecodeError as ude:
+        logging.error(("%s has invalid content as ack1 file, error message:" % orphan)+ str(ude))
+        logging.exception("process_ack1_file UnicodeDecodeError: %s" % orphan)
     except IOError as (errno, strerror):
         logging.error("process_ack1_file I/O error({0}): {1}".format(errno, strerror))
     except Exception as e:
@@ -268,16 +295,17 @@ def process_ack1_file(my_config, orphan, file_content):
 
 
 def process_ack2_file(my_config, orphan, file_content):
-    message_id = get_messageid_from_ack2_content(file_content)
-    core_id = get_coreid_from_ack2_content(file_content)
-
-    source_file = os.path.join(my_config.folder_remoteorphan, orphan)
-    target_file = os.path.join(my_config.folder_localinbox, orphan)
-    ack2_flag = os.path.join(my_config.folder_ack2flag, message_id)
-    ack3_flag = os.path.join(my_config.folder_ack3flag, core_id)
-    file_tobedelete = os.path.join(my_config.folder_tobedeleted, orphan)
-
     try:
+
+        message_id = get_messageid_from_ack2_content(file_content)
+        core_id = get_coreid_from_ack2_content(file_content)
+
+        source_file = os.path.join(my_config.folder_remoteorphan, orphan)
+        target_file = os.path.join(my_config.folder_localinbox, orphan)
+        ack2_flag = os.path.join(my_config.folder_ack2flag, message_id)
+        ack3_flag = os.path.join(my_config.folder_ack3flag, core_id)
+        file_tobedelete = os.path.join(my_config.folder_tobedeleted, orphan)
+
         # shutil.copyfile(source_file, target_file)
         logging.debug("Start to write down content to ACK2 file!")
         if not create_file(my_config, source_file, target_file, file_content, "ACK2"):
@@ -301,6 +329,9 @@ def process_ack2_file(my_config, orphan, file_content):
             logging.error("process_ack2_file remove I/O error({0}): {1}".format(errno, strerror))
         except Exception as e:
             logging.exception("process_ack2_file remove Unexpected error:{0}".format(sys.exc_info()[0]))
+    except UnicodeDecodeError as ude:
+        logging.error(("%s has invalid content as ack2 file, error message:" % orphan)+ str(ude))
+        logging.exception("process_ack2_file UnicodeDecodeError: %s" % orphan)
     except IOError as (errno, strerror):
         logging.error("process_ack2_file I/O error({0}): {1}".format(errno, strerror))
     except Exception as e:
@@ -308,13 +339,13 @@ def process_ack2_file(my_config, orphan, file_content):
 
 
 def process_ack3_file(my_config, orphan, file_content):
-    core_id = get_coreid_from_ack3_content(file_content)
-    source_file = os.path.join(my_config.folder_remoteorphan, orphan)
-    target_file = os.path.join(my_config.folder_localinbox, orphan)
-    ack3_flag = os.path.join(my_config.folder_ack3flag, core_id)
-    file_tobedelete = os.path.join(my_config.folder_tobedeleted, orphan)
-
     try:
+        core_id = get_coreid_from_ack3_content(file_content)
+        source_file = os.path.join(my_config.folder_remoteorphan, orphan)
+        target_file = os.path.join(my_config.folder_localinbox, orphan)
+        ack3_flag = os.path.join(my_config.folder_ack3flag, core_id)
+        file_tobedelete = os.path.join(my_config.folder_tobedeleted, orphan)
+
         logging.debug("Start process_ack3_file...")
         if not create_file(my_config, source_file, target_file, file_content, "ACK3"):
             logging.error("Unexpected error happened in ack3 file creation!")
@@ -336,6 +367,9 @@ def process_ack3_file(my_config, orphan, file_content):
             logging.error("process_ack3_file remove I/O error({0}): {1}".format(errno, strerror))
         except Exception as e:
             logging.exception("process_ack3_file remove Unexpected error:{0}".format(sys.exc_info()[0]))
+    except UnicodeDecodeError as ude:
+        logging.error(("%s has invalid content as ack3 file, error message:" % orphan)+ str(ude))
+        logging.exception("process_ack3_file UnicodeDecodeError: %s" % orphan)
     except IOError as (errno, strerror):
         logging.error("process_ack3_file I/O error({0}): {1}".format(errno, strerror))
     except Exception as e:

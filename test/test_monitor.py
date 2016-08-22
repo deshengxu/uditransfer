@@ -67,6 +67,22 @@ class MonitorTestCase(unittest.TestCase):
         core_id = monitor.get_coreid_from_ack3_content(ack2_content)
         assert(not core_id)
 
+    def test_is_valid_hl7_message(self):
+        hl7_1_file = r'../sample/HL7/fda_15ff7927-91f6-4fd8-80cb-bbddc6fa0cd1.tar.gz'
+        hl7_2_file = r'../sample/HL7/fda_a383c97e-5749-4c0c-aff9-1f3883a34191.tar.gz'
+        hl7_3_file = r'../sample/HL7/fda_f012caf2-d546-4885-a2e6-0640dfd408e2.tar.gz'
+        ack1_file = r'../sample/ACKs/fda_f012caf2-d546-4885-a2e6-0640dfd408e2.tar.gz'
+        ack2_file = r'../sample/ACKs/ACK2_fda_f012caf2-d546-4885-a2e6-0640dfd408e2.tar.gz'
+        ack3_file = r'../sample/ACKs/ACK3_fda_f012caf2-d546-4885-a2e6-0640dfd408e2.tar.gz'
+        assert (monitor.is_valid_hl7_message(hl7_1_file))
+        assert (monitor.is_valid_hl7_message(hl7_2_file))
+        assert (monitor.is_valid_hl7_message(hl7_3_file))
+
+        assert (not monitor.is_valid_hl7_message(ack1_file))
+        assert (not monitor.is_valid_hl7_message(ack2_file))
+        assert (not monitor.is_valid_hl7_message(ack3_file))
+
+
     def test_process_orphan_acks(self):
         ack1_file = r'fda_f012caf2-d546-4885-a2e6-0640dfd408e2.tar.gz'
         ack2_file = r'ACK2_fda_f012caf2-d546-4885-a2e6-0640dfd408e2.tar.gz'
@@ -74,7 +90,8 @@ class MonitorTestCase(unittest.TestCase):
 
         assert(os.path.exists(self.config.folder_remoteorphan))
 
-        ack_files = self.get_file_list(self.folder_acks)
+        ack_files = monitor.get_file_list(self.folder_acks)
+        #ack_files = [ack1_file, ack2_file, ack3_file]
         for ack in ack_files:
             src_file = os.path.join(self.folder_acks, ack)
             target_file = os.path.join(self.config.folder_remoteorphan, ack)
@@ -85,27 +102,27 @@ class MonitorTestCase(unittest.TestCase):
         assert (os.path.exists(os.path.join(self.config.folder_remoteorphan, ack2_file)))
         assert (os.path.exists(os.path.join(self.config.folder_remoteorphan, ack3_file)))
 
-        hl7_files = self.get_file_list(self.folder_hl7)
+        hl7_files = monitor.get_file_list(self.folder_hl7)
         for hl7 in hl7_files:
             if hl7 in ack_files:
                 src_file = os.path.join(self.folder_hl7, hl7)
                 target_file = os.path.join(self.config.folder_ack1flag, hl7)
                 shutil.copyfile(src_file, target_file)
 
-        orphan_files = self.get_file_list(self.config.folder_remoteorphan)
+        orphan_files = monitor.get_file_list(self.config.folder_remoteorphan)
         #assert(len(orphan_files) == len(ack_files))
 
         monitor.process_orphan_acks(self.config)
-        local_inbox_files = self.get_file_list(self.config.folder_localinbox)
+        local_inbox_files = monitor.get_file_list(self.config.folder_localinbox)
         assert (len(local_inbox_files) == 1)
 
         monitor.process_orphan_acks(self.config)
-        local_inbox_files = self.get_file_list(self.config.folder_localinbox)
+        local_inbox_files = monitor.get_file_list(self.config.folder_localinbox)
         assert (len(local_inbox_files) == 2)
 
         monitor.process_orphan_acks(self.config)
 
-        local_inbox_files = self.get_file_list(self.config.folder_localinbox)
+        local_inbox_files = monitor.get_file_list(self.config.folder_localinbox)
         assert(len(local_inbox_files) == 3)
         assert (os.path.exists(os.path.join(self.config.folder_localinbox, ack1_file)))
         assert (os.path.exists(os.path.join(self.config.folder_localinbox, ack2_file)))
@@ -118,11 +135,15 @@ class MonitorTestCase(unittest.TestCase):
     def test_process_hl7_message(self):
         assert(self.config)
         assert(self.config.folder_localoutbox)
-        onlyfiles = self.get_file_list(self.folder_hl7)
+        hl7_1_file = r'../sample/HL7/fda_15ff7927-91f6-4fd8-80cb-bbddc6fa0cd1.tar.gz'
+        hl7_2_file = r'../sample/HL7/fda_a383c97e-5749-4c0c-aff9-1f3883a34191.tar.gz'
+        hl7_3_file = r'../sample/HL7/fda_f012caf2-d546-4885-a2e6-0640dfd408e2.tar.gz'
+
+        onlyfiles = [hl7_1_file, hl7_2_file, hl7_3_file]
 
         for hl7_file in onlyfiles:
-            srcfile = os.path.join(self.folder_hl7, hl7_file)
-            tgtfile = os.path.join(self.config.folder_localoutbox, hl7_file)
+            srcfile = os.path.join(self.folder_hl7, os.path.basename(hl7_file))
+            tgtfile = os.path.join(self.config.folder_localoutbox, os.path.basename(hl7_file))
             shutil.copyfile(srcfile, tgtfile)
             assert(os.path.exists(tgtfile))
 
@@ -145,11 +166,6 @@ class MonitorTestCase(unittest.TestCase):
         with open(file_name, 'r') as content_file:
             return content_file.read()
 
-    def get_file_list(self, folder):
-        onlyfiles = [f for f in os.listdir(folder)
-                     if os.path.isfile(os.path.join(folder, f))]
-        return onlyfiles
-
     def cleanse_files(self):
 
         folder_list = [self.config.folder_localinbox, self.config.folder_localoutbox,
@@ -159,7 +175,7 @@ class MonitorTestCase(unittest.TestCase):
                        self.config.folder_tobedeleted]
 
         for one_folder in folder_list:
-            onlyfiles = self.get_file_list(one_folder)
+            onlyfiles = monitor.get_file_list(one_folder)
             for one_file in onlyfiles:
                 file_tobedelete = os.path.join(one_folder, one_file)
                 os.remove(file_tobedelete)
