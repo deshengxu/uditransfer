@@ -97,6 +97,30 @@ def create_ack1_flag_from_hl7(my_config, hl7_file):
         logging.exception("Error happened in copy %s to ack1_flag folder!" % hl7_file)
         return False
 
+def copy_or_move_wrong_hl7(my_config, hl7_file):
+    try:
+        src_file = os.path.join(my_config.folder_localoutbox, hl7_file)
+        target_file = os.path.join(my_config.folder_hl7flag, hl7_file)
+
+        if my_config.hl7_operation_method_is_copy:
+            logging.debug("Start to copy wrong hl7 %s to %s" % (src_file, target_file))
+            shutil.copyfile(src_file, target_file)
+            logging.info("Successfully copied wrong hl7 %s to %s!" % (src_file, target_file))
+            os.remove(src_file)
+            logging.info("Successfully removed wrong hl7 source file after copy:%s" % src_file)
+        else:
+            logging.debug("Start to move wrong hl7 %s to %s" % (src_file, target_file))
+            shutil.move(src_file, target_file)
+            logging.info("Successfully moved wrong hl7 %s to %s!" % (src_file, target_file))
+
+        return True
+    except IOError as (errno, strerror):
+        logging.error("I/O error({0}) for wrong hl7: {1}".format(errno, strerror))
+        return False
+    except Exception as e:
+        logging.error("Unexpected error:{0}".format(sys.exc_info()[0]))
+        logging.exception("Error happened in copy wrong hl7 %s to remote outbox folder!" % hl7_file)
+        return False
 
 def copy_or_move_hl7_to_remoteoutbox(my_config, hl7_file):
     try:
@@ -140,6 +164,8 @@ def process_hl7_message(my_config):
                 hl7_copy_status = copy_or_move_hl7_to_remoteoutbox(my_config, hl7_file)
         else:
             logging.warning("Unknown file found in HL7 local outbox folder:%s" % os.path.basename(hl7_file))
+            copy_or_move_wrong_hl7(my_config, hl7_file)
+
     logging.info("Processing in local outbox folder has been finished!")
 
 

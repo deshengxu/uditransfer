@@ -133,11 +133,6 @@ class MonitorTestCase(unittest.TestCase):
 
         #assert(not os.path.exists(ack1_flag))
 
-    def test_shell_commands(self):
-        assert(len(self.config.hl7_operation_shell_commands)==1)
-        assert(len(self.config.ack_operation_shell_commands)==1)
-
-
     def test_chmod_command(self):
         assert (self.config)
         assert (self.config.folder_remoteoutbox)
@@ -149,12 +144,59 @@ class MonitorTestCase(unittest.TestCase):
 
         for hl7_file in onlyfiles:
             srcfile = os.path.join(self.folder_hl7, os.path.basename(hl7_file))
-            tgtfile = os.path.join(self.config.folder_remoteoutbox, os.path.basename(hl7_file))
+            tgtfile = os.path.join(self.config.folder_localoutbox, os.path.basename(hl7_file))
+            shutil.copyfile(srcfile, tgtfile)
+            assert(os.path.exists(tgtfile))
+            monitor.process_hl7_shell_commands(self.config, tgtfile)
+            assert (oct(os.stat(tgtfile)[stat.ST_MODE])[-3:] == '666')
+
+        total_files = len(onlyfiles)
+        files_in_localoutbox = monitor.get_file_list(self.config.folder_localoutbox)
+        assert (len(files_in_localoutbox) == total_files)
+
+        monitor.process_hl7_message(self.config)
+
+        files_in_localoutbox = monitor.get_file_list(self.config.folder_localoutbox)
+        assert(len(files_in_localoutbox)==0)
+
+        files_in_ac1flag = monitor.get_file_list(self.config.folder_ack1flag)
+        assert(len(files_in_ac1flag) == total_files)
+
+        files_in_remoteoutbox = monitor.get_file_list(self.config.folder_remoteoutbox)
+        assert(len(files_in_remoteoutbox) == total_files)
+
+
+    def test_process_wrong_hl7_message(self):
+        assert (self.config)
+        assert (self.config.folder_localinbox)
+        hl7_1_file_wrong = r'../sample/ACKs/fda_f012caf2-d546-4885-a2e6-0640dfd408e2.tar.gz'
+        hl7_2_file_wrong = r'../sample/ACKs/ACK2_fda_f012caf2-d546-4885-a2e6-0640dfd408e2.tar.gz'
+        hl7_3_file_wrong = r'../sample/ACKs/ACK3_fda_f012caf2-d546-4885-a2e6-0640dfd408e2.tar.gz'
+
+        onlyfiles = [hl7_1_file_wrong, hl7_2_file_wrong, hl7_3_file_wrong]
+        for hl7_file in onlyfiles:
+            srcfile = os.path.join(self.folder_acks, os.path.basename(hl7_file))
+            tgtfile = os.path.join(self.config.folder_localoutbox, os.path.basename(hl7_file))
             shutil.copyfile(srcfile, tgtfile)
             assert (os.path.exists(tgtfile))
-            assert(oct(os.stat(tgtfile)[stat.ST_MODE])[-3:] == '644')
-            monitor.process_hl7_shell_commands(self.config, tgtfile)
-            assert (oct(os.stat(tgtfile)[stat.ST_MODE])[-3:] == '666' )
+
+        total_files = len(onlyfiles)
+        files_in_localoutbox = monitor.get_file_list(self.config.folder_localoutbox)
+        assert (len(files_in_localoutbox) == total_files)
+
+        monitor.process_hl7_message(self.config)
+
+        files_in_localoutbox = monitor.get_file_list(self.config.folder_localoutbox)
+        assert (len(files_in_localoutbox) == 0)
+
+        files_in_ac1flag = monitor.get_file_list(self.config.folder_ack1flag)
+        assert (len(files_in_ac1flag) == 0)
+
+        files_in_remoteoutbox = monitor.get_file_list(self.config.folder_remoteoutbox)
+        assert (len(files_in_remoteoutbox) == 0)
+
+        files_in_hl7flag = monitor.get_file_list(self.config.folder_hl7flag)
+        assert (len(files_in_hl7flag) == total_files)
 
     def test_process_hl7_message(self):
         assert(self.config)
