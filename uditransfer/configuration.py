@@ -4,6 +4,7 @@ import logging
 import codecs
 
 from ConfigParser import SafeConfigParser
+import ConfigParser
 
 class monitor_configuration():
     def __init__(self, configuration_file):
@@ -29,7 +30,29 @@ class monitor_configuration():
         self.hl7_operation_method_is_move = False
         self.hl7_operation_delay = 0.1
 
+        self.hl7_operation_shell_commands = []
+        self.ack_operation_shell_commands = []
+
         self.validate_configuration(configuration_file)
+
+
+    def __get_option_list(self, parser, section, option_prefix, range_index):
+        option_list = []
+
+        try:
+            for index in range(range_index):
+                option_name = option_prefix + "_" + str(index)
+
+                option_value = parser.get(section, option_name)
+
+                if option_value:
+                    option_value = option_value.strip()
+                    if len(option_value)>0:
+                        option_list.append(option_value)
+        except ConfigParser.NoOptionError:
+            return option_list
+
+        return option_list
 
     def __get_log_option(self, log_str, default_log):
         log_dict = {
@@ -109,6 +132,13 @@ class monitor_configuration():
             self.hl7_operation_delay = 0.1
 
         self.sleeptime = int(parser.get('General', 'sleeptime'))
+
+        #HL7 shell command
+        self.hl7_operation_shell_commands = self.__get_option_list(parser, "General",
+                                                                   "hl7_operation_shell_command", 20)
+
+        self.ack_operation_shell_commands = self.__get_option_list(parser, "General",
+                                                                   "ack_operation_shell_command", 20)
 
         tmp_folder = self.folder_localinbox
         if not os.path.exists(tmp_folder):

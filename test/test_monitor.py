@@ -3,6 +3,7 @@ import sys
 import os
 import shutil
 import logging
+import stat
 
 try:
     from uditransfer import monitor
@@ -108,6 +109,8 @@ class MonitorTestCase(unittest.TestCase):
                 src_file = os.path.join(self.folder_hl7, hl7)
                 target_file = os.path.join(self.config.folder_ack1flag, hl7)
                 shutil.copyfile(src_file, target_file)
+                monitor.process_ack_shell_commands(self.config, target_file)
+                assert (oct(os.stat(target_file)[stat.ST_MODE])[-3:] == '666')
 
         orphan_files = monitor.get_file_list(self.config.folder_remoteorphan)
         #assert(len(orphan_files) == len(ack_files))
@@ -130,7 +133,28 @@ class MonitorTestCase(unittest.TestCase):
 
         #assert(not os.path.exists(ack1_flag))
 
+    def test_shell_commands(self):
+        assert(len(self.config.hl7_operation_shell_commands)==1)
+        assert(len(self.config.ack_operation_shell_commands)==1)
 
+
+    def test_chmod_command(self):
+        assert (self.config)
+        assert (self.config.folder_remoteoutbox)
+        hl7_1_file = r'../sample/HL7/fda_15ff7927-91f6-4fd8-80cb-bbddc6fa0cd1.tar.gz'
+        hl7_2_file = r'../sample/HL7/fda_a383c97e-5749-4c0c-aff9-1f3883a34191.tar.gz'
+        hl7_3_file = r'../sample/HL7/fda_f012caf2-d546-4885-a2e6-0640dfd408e2.tar.gz'
+
+        onlyfiles = [hl7_1_file, hl7_2_file, hl7_3_file]
+
+        for hl7_file in onlyfiles:
+            srcfile = os.path.join(self.folder_hl7, os.path.basename(hl7_file))
+            tgtfile = os.path.join(self.config.folder_remoteoutbox, os.path.basename(hl7_file))
+            shutil.copyfile(srcfile, tgtfile)
+            assert (os.path.exists(tgtfile))
+            assert(oct(os.stat(tgtfile)[stat.ST_MODE])[-3:] == '644')
+            monitor.process_hl7_shell_commands(self.config, tgtfile)
+            assert (oct(os.stat(tgtfile)[stat.ST_MODE])[-3:] == '666' )
 
     def test_process_hl7_message(self):
         assert(self.config)
@@ -146,6 +170,8 @@ class MonitorTestCase(unittest.TestCase):
             tgtfile = os.path.join(self.config.folder_localoutbox, os.path.basename(hl7_file))
             shutil.copyfile(srcfile, tgtfile)
             assert(os.path.exists(tgtfile))
+            monitor.process_hl7_shell_commands(self.config, tgtfile)
+            assert (oct(os.stat(tgtfile)[stat.ST_MODE])[-3:] == '666')
 
         total_files = len(onlyfiles)
         files_in_localoutbox = monitor.get_file_list(self.config.folder_localoutbox)

@@ -5,6 +5,7 @@ import argparse
 import os
 import shutil
 import tarfile
+import subprocess
 
 sys.path.append(".")
 
@@ -14,6 +15,30 @@ try:
 except:
     import util
     import configuration
+
+
+def process_hl7_shell_commands(my_config, target_file):
+    process_shell_commands(my_config.hl7_operation_shell_commands, target_file)
+
+
+def process_ack_shell_commands(my_config, target_file):
+    process_shell_commands(my_config.ack_operation_shell_commands, target_file)
+
+
+def process_shell_commands(command_list, target_file):
+    for command in command_list:
+        command = command.replace('"', '')
+        command = command.replace(r"&target", '"' + os.path.abspath(target_file) + '"')
+        try:
+            return_code = subprocess.call([command], shell=True)
+            if return_code == 0:
+                logging.info("Successfully executed command:%s" % command)
+            else:
+                logging.info("Returned value is: %d from command:%s" % (return_code, command))
+        except subprocess.CalledProcessError as e:
+            print(e.output)
+            logging.debug("Error happened in command execution:%s" % command)
+            logging.debug(e.output)
 
 def get_hl7_message_files(my_config):
     return get_file_list(my_config.folder_localoutbox)
@@ -89,6 +114,9 @@ def copy_or_move_hl7_to_remoteoutbox(my_config, hl7_file):
             shutil.move(src_file, target_file)
             logging.info("Successfully moved %s to %s!" % (src_file, target_file))
 
+        #20160902 added in order to support shell command after copy or move
+        process_hl7_shell_commands(my_config, target_file)
+        #20160902 done
         return True
     except IOError as (errno, strerror):
         logging.error("I/O error({0}): {1}".format(errno, strerror))
@@ -243,6 +271,9 @@ def create_file(my_config, source_file, target_file, file_content, notes):
             with open(target_file, "w") as target:
                 target.write(file_content)
                 logging.info("Successfully write down %s content into file:%s" % (notes,target_file))
+        #20160902 added to support shell commands after copy or move
+        process_ack_shell_commands(my_config, target_file)
+        #20160902 Done
 
         return True
     except Exception as e:
