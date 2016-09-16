@@ -4,6 +4,7 @@ import os
 import shutil
 import logging
 import stat
+import codecs
 
 try:
     from uditransfer import monitor
@@ -23,6 +24,7 @@ class MonitorTestCase(unittest.TestCase):
         self.folder_sample = "../sample"
         self.folder_hl7 = "../sample/HL7"
         self.folder_acks = "../sample/ACKs"
+        self.folder_ghxack = "../sample/ack"
         self.config = configuration.monitor_configuration("../sample/sample_config.ini")
         self.cleanse_files()
 
@@ -30,9 +32,34 @@ class MonitorTestCase(unittest.TestCase):
         assert(os.path.exists(self.folder_sample))
         assert(os.path.exists(self.folder_hl7))
         assert(os.path.exists(self.folder_acks))
+        assert(os.path.exists(self.folder_ghxack))
         assert(len(list(os.listdir(self.folder_hl7)))>0)
         assert (len(list(os.listdir(self.folder_acks))) > 0)
+        assert(len(list(os.listdir(self.folder_ghxack)))>0)
         assert(os.path.exists(self.config.folder_localinbox))
+
+    def test_ack3_encoding(self):
+        ack3_file_name = r'ci1474006022846.2416915@fdsuv05638_te1.xml'
+        ghx_ack_file = os.path.join(self.folder_ghxack,"temp", ack3_file_name)
+        assert(os.path.exists(ghx_ack_file))
+
+        ghx_asc_content = None
+        ghx_utf_content = None
+
+        with open(ghx_ack_file, 'r') as content_file:
+            ghx_asc_content = content_file.read()
+
+        with codecs.open(ghx_ack_file, 'r', encoding="utf8") as content_file:
+            ghx_utf_content = content_file.read()
+
+        print("ASC_Content:\n%s" % (ghx_asc_content))
+        print("\n\nUTF Content:\n%s" % (ghx_utf_content))
+
+        coreID_asc = monitor.get_coreid_from_ack3_content(ghx_asc_content)
+        coreID_utf = monitor.get_coreid_from_ack3_content(ghx_utf_content)
+        print("ASC CoreID:%s" % coreID_asc)
+        print("\n\nUTF CoreID:%s" % coreID_utf)
+        assert(coreID_asc == coreID_utf)
 
     def test_detect_ack_file(self):
         ack1_file = r'../sample/ACKs/fda_f012caf2-d546-4885-a2e6-0640dfd408e2.tar.gz'
@@ -212,14 +239,17 @@ class MonitorTestCase(unittest.TestCase):
             tgtfile = os.path.join(self.config.folder_localoutbox, os.path.basename(hl7_file))
             shutil.copyfile(srcfile, tgtfile)
             assert(os.path.exists(tgtfile))
-            monitor.process_hl7_shell_commands(self.config, tgtfile)
-            assert (oct(os.stat(tgtfile)[stat.ST_MODE])[-3:] == '666')
 
         total_files = len(onlyfiles)
         files_in_localoutbox = monitor.get_file_list(self.config.folder_localoutbox)
         assert (len(files_in_localoutbox) == total_files)
 
         monitor.process_hl7_message(self.config)
+
+        for hl7_file in onlyfiles:
+            tgtfile = os.path.join(self.config.folder_remoteoutbox, os.path.basename(hl7_file))
+            assert (os.path.exists(tgtfile))
+            assert (oct(os.stat(tgtfile)[stat.ST_MODE])[-3:] == '666')
 
         files_in_localoutbox = monitor.get_file_list(self.config.folder_localoutbox)
         assert(len(files_in_localoutbox)==0)

@@ -231,12 +231,12 @@ def get_coreid_from_ack2_content(file_content):
 
 def get_coreid_from_ack3_content(file_content):
     logging.debug(file_content)
-    ACK3_XML1 = r'<?xml version="1.0" encoding="UTF-8"?>'
+    ACK3_XML1 = r'<?xml version="1.0" encoding="UTF-8"?>'   #ACK3 file from FDA doesn't have this tag
     ACK3_XML2 = r'<submission>'
     CORE_ID_START = r'<coreId>'
     CORE_ID_END = r'</coreId>'
     #print(file_content)
-    if file_content.find(ACK3_XML1)>=0 and file_content.find(ACK3_XML2)>=0:
+    if file_content.find(ACK3_XML2)>=0:
         int_start = file_content.find(CORE_ID_START)
         int_end = file_content.find(CORE_ID_END)
         if int_start>=0 and int_end>=0:
