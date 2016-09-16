@@ -1,0 +1,28 @@
+<submission>
+  <coreId>ci1474006022846.2416915@fdsuv05638_te1</coreId>
+  <batchId />
+  <dateEntered>09-16-2016, 02:10:11</dateEntered>
+  <numReportFailed>2</numReportFailed>
+  <numReportPassed>0</numReportPassed>
+  <report id=''>
+    <status>failed</status>
+  </report>
+  <failure>
+    <reportId />
+    <detail>
+      <section />
+      <errorMessage>STEP 2.  Unable to parse XML.</errorMessage>
+      <messageValue />
+      <xPath />
+    </detail>
+  </failure>
+  <failure>
+    <reportId />
+    <detail>
+      <section />
+      <errorMessage>STEP 2. One or more of the required validation attributes is null/non-existent: [/document/setId/@root:null, /document/component/structuredBody/component/section/subject/manufacturedProduct/manufacturedProduct/code/@code:23456789012345, /document/versionNumber/@value:1]</errorMessage>
+      <messageValue />
+      <xPath />
+    </detail>
+  </failure>
+</submission>

@@ -1,0 +1,7 @@
+MessageId: <mendAS2-1474006022149-12905@UDIGHXCOMS_ZZFDATST>
+CoreId: ci1474006022846.2416915@fdsuv05638_te1
+DateTime Receipt Generated: 09-16-2016, 02:10:11
+File Count: 1
+Directory Count: 2
+
+"CDRH has received your submission"
